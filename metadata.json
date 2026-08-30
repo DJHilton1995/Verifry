@@ -1,0 +1,8 @@
+{
+  "name": "Verifryer Scanner",
+  "description": "Browser-based application scanner with post-quantum cryptographic handshake logic.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
