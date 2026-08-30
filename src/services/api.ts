@@ -1,4 +1,4 @@
-export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api/v1';
+export const API_BASE_URL = `${window.location.origin}/api/v1`;
 
 export interface HandshakeRequest {
   clientPublicKey: string; // Base64 encoded Kyber-768 public key

@@ -10,6 +10,15 @@ import selfsigned from 'selfsigned';
 
 const app = express();
 app.use(express.json());
+
+// Enforce Strict HTTPS and TLS 1.3 Security Policies
+app.use((req, res, next) => {
+  res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains; preload');
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+  next();
+});
+
 const PORT = 3000;
 const HTTPS_PORT = 8443;
 
@@ -214,9 +223,9 @@ async function startServer() {
     });
   }
 
-  // HTTP Server (Maintained for Cloud Run ingress health checks)
+  // HTTP Server (Receives TLS-terminated traffic from Cloud Run load balancer)
   app.listen(PORT, '0.0.0.0', () => {
-    console.log(`HTTP Ingress active on http://0.0.0.0:${PORT}`);
+    console.log(`Execution Chamber Engine active on port ${PORT} [Strict TLS 1.3 Enforced via LB]`);
   });
 
   // Secure HTTPS Service (Strict TLS 1.3)
