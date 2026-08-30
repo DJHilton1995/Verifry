@@ -24,32 +24,7 @@ interface Vulnerability {
   affectedModule: string;
 }
 
-const MOCK_VULNERABILITIES: Vulnerability[] = [
-  {
-    id: 'HW-IPS-001',
-    title: 'Cryptojacking (Stratum Protocol)',
-    severity: 'critical',
-    description: 'Outbound TCP payload matches Stratum mining protocol signatures ("method": "mining.subscribe"). Suspected xmrig/minerd activity.',
-    remediation: 'Process SIGKILL\'d. nftables rule added to drop destination IP on the output chain.',
-    affectedModule: 'Crypto Defeat Engine',
-  },
-  {
-    id: 'HW-DPI-002',
-    title: 'High Payload Entropy',
-    severity: 'high',
-    description: 'Calculated Shannon entropy > 7.9, indicating heavily obfuscated or encrypted binary transfer typical of packed malware.',
-    remediation: 'Connection terminated. Entropy Lock engaged on source IP.',
-    affectedModule: 'Passive DPI',
-  },
-  {
-    id: 'HW-IPS-003',
-    title: 'ARP Poisoning / MITM',
-    severity: 'high',
-    description: 'Gateway MAC address mismatch detected on the local subnet. Legitimate MAC differs from current ARP resolution.',
-    remediation: 'Static ARP entry enforced. Attacker MAC dropped from interface.',
-    affectedModule: 'ARP Lockdown',
-  }
-];
+// Using dynamic vulnerabilities from the real backend instead of mocks
 
 export default function App() {
   const [targetApp, setTargetApp] = useState('');
@@ -68,6 +43,10 @@ export default function App() {
     }]);
   };
 
+  const [vulnerabilities, setVulnerabilities] = useState<Vulnerability[]>([]);
+  const [score, setScore] = useState<number | null>(null);
+  const [grade, setGrade] = useState<string | null>(null);
+
   const startScan = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!targetApp) return;
@@ -75,76 +54,64 @@ export default function App() {
     setPhase('handshake');
     setLogs([]);
     setProgress(0);
+    setVulnerabilities([]);
+    setScore(null);
+    setGrade(null);
 
     try {
-      addLog(`Initiating connection to ${targetApp}...`, 'info', 'SYSTEM');
-      await new Promise(r => setTimeout(r, 800));
+      addLog(`Initiating ECDH Key Exchange to target domain...`, 'info', 'SYSTEM');
       
-      addLog('Generating Kyber-768 keypair for encapsulation...', 'info', 'KYBER');
-      const fakeClientPubKey = btoa('mock-client-public-key-bytes');
-      await new Promise(r => setTimeout(r, 800));
+      const fakeClientPubKey = btoa('client-public-key-exchange');
+      const handshakeRes = await VerifryerAPI.initiateHandshake(fakeClientPubKey);
       
-      addLog('Public key transmitted. Awaiting Rust backend response...', 'info', 'KYBER');
-      setProgress(15);
-      
-      try {
-        const handshakeRes = await VerifryerAPI.initiateHandshake(fakeClientPubKey);
-        addLog(`Ciphertext received (Session: ${handshakeRes.sessionId}). Decapsulating shared secret...`, 'info', 'KYBER');
-      } catch (err) {
-        const errMsg = err instanceof Error ? err.message : 'Unknown error';
-        addLog(`Backend unavailable (${errMsg}). Falling back to simulation mode...`, 'warning', 'SYSTEM');
-        await new Promise(r => setTimeout(r, 1000));
-      }
-      
-      addLog('Shared secret established (256-bit). Deriving keys via HKDF-SHA256...', 'success', 'KYBER');
-      setProgress(30);
-      await new Promise(r => setTimeout(r, 1200));
-
-      addLog('Secure tunnel established (ChaCha20-Poly1305).', 'success', 'SYSTEM');
+      addLog(`Ciphertext received. Session established: ${handshakeRes.sessionId}`, 'success', 'KYBER');
+      addLog('Secure tunnel active.', 'success', 'SYSTEM');
+      setProgress(10);
       setPhase('scanning');
       
-      await new Promise(r => setTimeout(r, 800));
-      addLog('Commencing Host Warden Omni-Engine telemetry...', 'info', 'WARDEN');
-      setProgress(40);
+      addLog('Dispatching scan job to backend engine...', 'info', 'SCANNER');
       
-      try {
-        await VerifryerAPI.startScan('sim-session-123', targetApp);
-      } catch (err) {
-        // Ignore in UI, keep simulating
+      const scanRes = await VerifryerAPI.startScan(handshakeRes.sessionId, targetApp);
+      
+      if (!scanRes.jobId) throw new Error('Failed to retrieve job ID');
+      
+      // Polling Loop
+      let completed = false;
+      let lastLogCount = 0;
+
+      while (!completed) {
+        await new Promise(r => setTimeout(r, 600)); // Poll every 600ms
+        
+        const status = await VerifryerAPI.getScanStatus(scanRes.jobId);
+        
+        // Append only new logs
+        if (status.logs.length > lastLogCount) {
+          const newLogs = status.logs.slice(lastLogCount).map(l => ({
+            id: l.id,
+            timestamp: new Date(l.timestamp),
+            message: l.message,
+            type: l.level as any,
+            module: l.module
+          }));
+          setLogs(prev => [...prev, ...newLogs]);
+          lastLogCount = status.logs.length;
+        }
+
+        setProgress(status.progress);
+
+        if (status.status === 'complete' || status.status === 'failed') {
+          completed = true;
+          setPhase('complete');
+          if (status.results) {
+             setVulnerabilities(status.results.findings as any[]);
+             setScore(status.results.score);
+             setGrade(status.results.grade);
+          }
+        }
       }
-      
-      await new Promise(r => setTimeout(r, 1200));
-      addLog('Compiling multi-source threat blocklists...', 'info', 'WARDEN');
-      setProgress(50);
-      
-      await new Promise(r => setTimeout(r, 1500));
-      addLog('DPI: Calculating payload Shannon entropy...', 'info', 'DPI');
-      await new Promise(r => setTimeout(r, 800));
-      addLog('DPI: Critical entropy > 7.9 detected. Packed binary suspected.', 'warning', 'DPI');
-      setProgress(65);
-      
-      await new Promise(r => setTimeout(r, 1200));
-      addLog('IPS: Monitoring SYN packet rate for DDoS signatures...', 'info', 'IPS');
-      await new Promise(r => setTimeout(r, 1000));
-      addLog('IPS: Verifying Gateway MAC address consistency (ARP Defense)...', 'info', 'IPS');
-      setProgress(75);
 
-      await new Promise(r => setTimeout(r, 1500));
-      addLog('IPS: Analyzing outbound payloads for stratum+tcp...', 'warning', 'IPS');
-      await new Promise(r => setTimeout(r, 800));
-      addLog('IPS: Cryptojacking signature "mining.subscribe" identified!', 'error', 'IPS');
-      setProgress(85);
-
-      await new Promise(r => setTimeout(r, 1200));
-      addLog('IPS: Enforcing nftables drop rules & SIGKILL on malicious PIDs...', 'success', 'SYSTEM');
-      setProgress(95);
-
-      await new Promise(r => setTimeout(r, 1000));
-      addLog('Scan complete. Telemetry report generated.', 'success', 'WARDEN');
-      setProgress(100);
-      setPhase('complete');
-    } catch (err) {
-      addLog(`Unexpected error during scan: ${err}`, 'error', 'SYSTEM');
+    } catch (err: any) {
+      addLog(`Fatal Error: ${err.message || err}`, 'error', 'SYSTEM');
       setPhase('idle');
     }
   };
@@ -351,12 +318,12 @@ export default function App() {
                     <div className="p-4 bg-black border border-red-500 flex flex-col items-center text-center shadow-[inset_0_0_15px_rgba(239,68,68,0.1)]">
                       <AlertTriangle className="w-8 h-8 text-red-500 mb-3" />
                       <h3 className="text-xs font-bold text-red-600 uppercase tracking-widest">Threats</h3>
-                      <p className="text-sm text-red-400 font-bold mt-1 uppercase">3 High/Critical</p>
+                      <p className="text-sm text-red-400 font-bold mt-1 uppercase">{vulnerabilities.filter(v => v.severity === 'high' || v.severity === 'critical').length} High/Critical</p>
                     </div>
-                    <div className="p-4 bg-black border border-red-500 flex flex-col items-center text-center shadow-[inset_0_0_15px_rgba(239,68,68,0.1)]">
-                      <ShieldAlert className="w-8 h-8 text-red-500 mb-3 neon-text" />
-                      <h3 className="text-xs font-bold text-red-600 uppercase tracking-widest">Security_Score</h3>
-                      <p className="text-sm text-red-400 font-bold mt-1 uppercase neon-text">42/100 (F)</p>
+                    <div className={`p-4 bg-black border flex flex-col items-center text-center ${score !== null && score >= 80 ? 'border-green-500 shadow-[inset_0_0_15px_rgba(34,197,94,0.1)]' : 'border-red-500 shadow-[inset_0_0_15px_rgba(239,68,68,0.1)]'}`}>
+                      <ShieldAlert className={`w-8 h-8 mb-3 neon-text ${score !== null && score >= 80 ? 'text-green-500' : 'text-red-500'}`} />
+                      <h3 className={`text-xs font-bold uppercase tracking-widest ${score !== null && score >= 80 ? 'text-green-600' : 'text-red-600'}`}>Security_Score</h3>
+                      <p className={`text-sm font-bold mt-1 uppercase neon-text ${score !== null && score >= 80 ? 'text-green-400' : 'text-red-400'}`}>{score ?? '?'}/100 ({grade ?? '?'})</p>
                     </div>
                   </div>
 
@@ -366,7 +333,7 @@ export default function App() {
                       <AlertTriangle className="w-4 h-4 text-yellow-500" /> Detected_Vulnerabilities
                     </h3>
                     <div className="space-y-3">
-                      {MOCK_VULNERABILITIES.map(vuln => (
+                      {vulnerabilities.map(vuln => (
                         <button
                           key={vuln.id}
                           onClick={() => setSelectedVuln(vuln)}

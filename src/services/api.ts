@@ -24,15 +24,24 @@ export interface ScanStatusResponse {
   status: 'scanning' | 'complete' | 'failed';
   progress: number;
   logs: Array<{
+    id: string;
     timestamp: string;
     message: string;
     level: 'info' | 'warning' | 'error' | 'success';
-    module: 'SYSTEM' | 'KYBER' | 'SCANNER';
+    module: 'SYSTEM' | 'KYBER' | 'SCANNER' | 'DPI' | 'IPS' | 'WARDEN';
   }>;
   results?: {
     vulnerabilities: number;
     score: number;
     grade: string;
+    findings: Array<{
+      id: string;
+      title: string;
+      severity: 'low' | 'medium' | 'high' | 'critical';
+      description: string;
+      remediation: string;
+      affectedModule: string;
+    }>;
   };
 }
 
