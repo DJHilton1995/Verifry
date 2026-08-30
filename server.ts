@@ -69,16 +69,16 @@ async function performRealScan(jobId: string, inputUrl: string) {
     let hostname = inputUrl.replace(/^https?:\/\//, '').split('/')[0];
     if (hostname.includes(':')) hostname = hostname.split(':')[0];
 
-    addLog(`Initiating DNS resolution for target: ${hostname}...`, 'info', 'SYSTEM');
+    addLog(`Locking target ${hostname} into execution chamber...`, 'info', 'SYSTEM');
     const addresses = await dns.resolve(hostname).catch(() => null);
     if (!addresses || addresses.length === 0) {
       throw new Error('DNS Resolution failed (NXDOMAIN)');
     }
-    addLog(`DNS Resolved: ${addresses.join(', ')}`, 'success', 'SYSTEM');
+    addLog(`DNS Resolved: ${addresses.join(', ')}. Target acquired.`, 'success', 'SYSTEM');
     job.progress = 20;
 
     // 2. Port Scan
-    addLog('Executing TCP Port Scan (21, 22, 80, 443, 3306, 8080)...', 'info', 'SCANNER');
+    addLog('Applying 10,000V probe to TCP ports (21, 22, 80, 443, 3306, 8080)...', 'info', 'SCANNER');
     const ports = [21, 22, 80, 443, 3306, 8080];
     const openPorts = [];
     for (const port of ports) {
@@ -93,12 +93,12 @@ async function performRealScan(jobId: string, inputUrl: string) {
         });
       } catch (e) {}
     }
-    addLog(`Open ports discovered: ${openPorts.length > 0 ? openPorts.join(', ') : 'None within timeout'}`, 'warning', 'SCANNER');
+    addLog(`Ports breached: ${openPorts.length > 0 ? openPorts.join(', ') : 'None within timeout'}`, 'warning', 'SCANNER');
     job.progress = 40;
 
     // 3. TLS Validation
-    addLog('Validating TLS Certificate Chain & Enforcing TLS 1.3 Strict Mode on port 443...', 'info', 'SCANNER');
-    addLog('[RUSTLS_WRAPPER] Initializing memory-safe TLS handshake parsing...', 'info', 'SYSTEM');
+    addLog('Surging 50,000V to validate TLS boundaries on port 443...', 'info', 'SCANNER');
+    addLog('[RUSTLS_WRAPPER] Initiating memory-safe high-voltage parsing...', 'info', 'SYSTEM');
     try {
       const certInfo: any = await new Promise((resolve, reject) => {
         const socket = tls.connect(443, hostname, { 
@@ -116,7 +116,7 @@ async function performRealScan(jobId: string, inputUrl: string) {
       });
 
       if (!certInfo.authorized) {
-        addLog(`TLS validation failed: ${certInfo.error}`, 'error', 'SCANNER');
+        addLog(`TLS validation failed: ${certInfo.error}. Fatal resistance detected.`, 'error', 'SCANNER');
         job.results.findings.push({
           id: 'VULN-TLS-01', title: 'Invalid TLS Certificate', severity: 'high',
           description: `TLS handshake failed validation: ${certInfo.error}. Vulnerable to MITM interception.`,
@@ -124,7 +124,7 @@ async function performRealScan(jobId: string, inputUrl: string) {
         });
         job.results.score -= 20;
       } else {
-        addLog(`Certificate valid. Subject: ${certInfo.cert?.subject?.CN}`, 'success', 'SCANNER');
+        addLog(`Certificate valid. Subject: ${certInfo.cert?.subject?.CN}. Resistance nominal.`, 'success', 'SCANNER');
       }
     } catch (err: any) {
       addLog(`TLS check failed (No HTTPS?): ${err.message}`, 'warning', 'SCANNER');
@@ -132,7 +132,7 @@ async function performRealScan(jobId: string, inputUrl: string) {
     job.progress = 70;
 
     // 4. HTTP Headers Check
-    addLog('Analyzing HTTP Security Headers...', 'info', 'SCANNER');
+    addLog('Frying HTTP Security Headers with 100,000V surge...', 'info', 'SCANNER');
     const headers: any = await new Promise((resolve, reject) => {
       const req = https.get(`https://${hostname}`, (res) => {
         resolve(res.headers);
@@ -190,10 +190,10 @@ async function performRealScan(jobId: string, inputUrl: string) {
     else if (job.results.score >= 60) job.results.grade = 'D';
     else job.results.grade = 'F';
 
-    addLog(`Scan complete. Final Score: ${job.results.score}`, 'success', 'SYSTEM');
+    addLog(`Execution complete. Target remains assessed. Final Survival Probability: ${job.results.score}%`, 'success', 'SYSTEM');
 
   } catch (err: any) {
-    addLog(`Fatal scan error: ${err.message}`, 'error', 'SYSTEM');
+    addLog(`Execution failed: Target melted prematurely. ${err.message}`, 'error', 'SYSTEM');
     job.status = 'failed';
   }
 }

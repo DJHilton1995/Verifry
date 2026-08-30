@@ -1,9 +1,148 @@
 @import "tailwindcss";
 
 body {
-  background-color: #000;
-  color: #22c55e;
+  background-color: #050000;
+  color: #ef4444;
   overflow-x: hidden;
+  margin: 0;
+}
+
+.dystopian-bg {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: radial-gradient(circle at center top, #1a0000 0%, #000000 100%);
+  z-index: -2;
+}
+
+.retro-grid {
+  position: fixed;
+  bottom: 0;
+  left: -50%;
+  width: 200%;
+  height: 60vh;
+  background-image: 
+    linear-gradient(to bottom, rgba(239, 68, 68, 0.4) 1px, transparent 1px),
+    linear-gradient(to right, rgba(239, 68, 68, 0.2) 1px, transparent 1px);
+  background-size: 100% 40px, 40px 100%;
+  transform-origin: top center;
+  transform: perspective(300px) rotateX(70deg);
+  animation: grid-move 2.5s linear infinite;
+  z-index: -1;
+  box-shadow: inset 0 150px 100px -50px #050000;
+}
+
+.grid-fade {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  width: 100vw;
+  height: 60vh;
+  background: linear-gradient(to bottom, #050000 0%, transparent 40%, rgba(239, 68, 68, 0.05) 100%);
+  z-index: -1;
+  pointer-events: none;
+}
+
+@keyframes grid-move {
+  0% { background-position: 0 0, 0 0; }
+  100% { background-position: 0 40px, 0 0; }
+}
+
+@keyframes electrocution-shake {
+  0%, 100% { transform: translate(0, 0) rotate(0deg); }
+  10% { transform: translate(-2px, 1px) rotate(-1deg); }
+  20% { transform: translate(3px, -2px) rotate(1deg); }
+  30% { transform: translate(-4px, 3px) rotate(0deg); }
+  40% { transform: translate(2px, -1px) rotate(1deg); }
+  50% { transform: translate(-2px, 2px) rotate(-1deg); }
+  60% { transform: translate(3px, -3px) rotate(2deg); }
+  70% { transform: translate(-1px, 2px) rotate(-1deg); }
+  80% { transform: translate(2px, -2px) rotate(1deg); }
+  90% { transform: translate(-3px, 1px) rotate(0deg); }
+}
+
+.electrocution-shake {
+  animation: electrocution-shake 0.15s infinite;
+  filter: contrast(1.2) brightness(1.1);
+}
+
+@keyframes voltage-flash {
+  0%, 95%, 100% { background-color: transparent; }
+  96% { background-color: rgba(255, 255, 255, 0.4); mix-blend-mode: overlay; }
+  98% { background-color: rgba(239, 68, 68, 0.2); }
+}
+
+.voltage-flash-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  pointer-events: none;
+  z-index: 9998;
+  animation: voltage-flash 2.5s infinite;
+}
+
+@keyframes arc-strike {
+  0% { opacity: 0; transform: scaleY(0.1) rotate(0deg); filter: brightness(1); }
+  2% { opacity: 1; transform: scaleY(1.2) rotate(4deg) translateX(10px); filter: brightness(2); }
+  4% { opacity: 0; transform: scaleY(0.1) rotate(-2deg); }
+  100% { opacity: 0; }
+}
+
+.critical-arc-overlay {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9997;
+  overflow: hidden;
+  mix-blend-mode: screen;
+}
+
+.arc-beam {
+  position: absolute;
+  background: #fff;
+  box-shadow: 0 0 15px #ef4444, 0 0 30px #ef4444, 0 0 50px #ef4444;
+  opacity: 0;
+}
+
+.arc-1 {
+  top: 0; left: 15%; width: 2px; height: 100vh;
+  transform-origin: top;
+  animation: arc-strike 3.2s infinite 0.5s;
+}
+
+.arc-2 {
+  top: 40%; left: 0; width: 100vw; height: 3px;
+  transform-origin: left;
+  animation: arc-strike 4.5s infinite 2.1s;
+}
+
+.arc-3 {
+  top: 0; left: 85%; width: 2px; height: 100vh;
+  transform-origin: bottom;
+  animation: arc-strike 2.8s infinite 1.2s;
+}
+
+.arc-4 {
+  top: 70%; left: 0; width: 100vw; height: 1px;
+  transform-origin: right;
+  animation: arc-strike 3.7s infinite 0.3s;
+}
+
+.critical-vignette {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9996;
+  animation: pulse-vignette 2s infinite alternate;
+}
+
+@keyframes pulse-vignette {
+  0% { box-shadow: inset 0 0 100px rgba(239, 68, 68, 0.2); }
+  100% { box-shadow: inset 0 0 200px rgba(239, 68, 68, 0.6); }
 }
 
 .crt-overlay {
@@ -12,25 +151,28 @@ body {
   left: 0;
   width: 100vw;
   height: 100vh;
-  background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
-  background-size: 100% 2px, 3px 100%;
+  background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.3) 50%), 
+              linear-gradient(90deg, rgba(255, 0, 0, 0.08), rgba(0, 0, 0, 0.02), rgba(0, 0, 0, 0.02));
+  background-size: 100% 3px, 3px 100%;
   z-index: 9999;
   pointer-events: none;
 }
 
 .neon-text {
-  text-shadow: 0 0 5px rgba(34, 197, 94, 0.8);
+  text-shadow: 0 0 5px rgba(239, 68, 68, 0.8), 0 0 10px rgba(239, 68, 68, 0.3);
 }
 
 .neon-border {
-  box-shadow: 0 0 8px rgba(34, 197, 94, 0.4), inset 0 0 8px rgba(34, 197, 94, 0.4);
+  box-shadow: 0 0 8px rgba(239, 68, 68, 0.3), inset 0 0 8px rgba(239, 68, 68, 0.2);
+  background-color: rgba(5, 0, 0, 0.85);
+  backdrop-filter: blur(4px);
 }
 
 .scanline {
   width: 100%;
   height: 10px;
   position: fixed;
-  background: rgba(34, 197, 94, 0.2);
+  background: rgba(239, 68, 68, 0.2);
   opacity: 0.5;
   animation: scanline 8s linear infinite;
   pointer-events: none;
