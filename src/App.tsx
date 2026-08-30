@@ -4,9 +4,11 @@ import { VerifryerAPI } from './services/api';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { 
-  Shield, Lock, Server, Terminal, CheckSquare, AlertTriangle, Zap, Key, ShieldAlert, Loader2, ScanSearch, X, Download, Skull, Flame, Activity
+  Shield, Lock, Server, Terminal, CheckSquare, AlertTriangle, Zap, Key, ShieldAlert, Loader2, ScanSearch, X, Download, Skull, Flame, Activity,
+  WifiOff, Radio, Crosshair, ShieldBan
 } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
+import { initAudio, updateGeigerProgress, stopGeiger, playStaticDischarge } from './utils/audio';
 
 type ScanPhase = 'idle' | 'handshake' | 'scanning' | 'complete';
 
@@ -27,6 +29,14 @@ interface Vulnerability {
   affectedModule: string;
 }
 
+interface ThreatEvent {
+  id: string;
+  ip: string;
+  type: string;
+  action: 'detected' | 'dropped' | 'blocked';
+  timestamp: Date;
+}
+
 // Using dynamic vulnerabilities from the real backend instead of mocks
 
 export default function App() {
@@ -35,6 +45,31 @@ export default function App() {
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [progress, setProgress] = useState(0);
   const [selectedVuln, setSelectedVuln] = useState<Vulnerability | null>(null);
+
+  const [threatFeed, setThreatFeed] = useState<ThreatEvent[]>([]);
+  const [vpnActive, setVpnActive] = useState(false);
+
+  // Live Threat Feed Simulation
+  useEffect(() => {
+    const threatTypes = ['SYN_FLOOD', 'SQL_INJECTION', 'XSS_PAYLOAD', 'BRUTE_FORCE', 'MALFORMED_PACKET', 'C2_BEACON'];
+    
+    const interval = setInterval(() => {
+      const newThreat: ThreatEvent = {
+        id: Math.random().toString(36).substring(7),
+        ip: `${Math.floor(Math.random() * 255)}.${Math.floor(Math.random() * 255)}.${Math.floor(Math.random() * 255)}.${Math.floor(Math.random() * 255)}`,
+        type: threatTypes[Math.floor(Math.random() * threatTypes.length)],
+        action: vpnActive ? 'blocked' : 'detected',
+        timestamp: new Date()
+      };
+      
+      setThreatFeed(prev => {
+        const next = [newThreat, ...prev];
+        return next.slice(0, 8); // Keep last 8
+      });
+    }, Math.random() * 3000 + 1000); // Random interval between 1-4 seconds
+    
+    return () => clearInterval(interval);
+  }, [vpnActive]);
 
   const addLog = (message: string, type: LogEntry['type'], module: LogEntry['module']) => {
     setLogs(prev => [...prev, {
@@ -49,6 +84,21 @@ export default function App() {
   const [vulnerabilities, setVulnerabilities] = useState<Vulnerability[]>([]);
   const [score, setScore] = useState<number | null>(null);
   const [grade, setGrade] = useState<string | null>(null);
+
+  // Audio Hooks
+  useEffect(() => {
+    if (phase === 'scanning') {
+      updateGeigerProgress(progress);
+    } else {
+      stopGeiger();
+    }
+  }, [progress, phase]);
+
+  useEffect(() => {
+    if (phase === 'complete' && vulnerabilities.some(v => v.severity === 'critical')) {
+      playStaticDischarge();
+    }
+  }, [phase, vulnerabilities]);
 
   const generatePDF = () => {
     const doc = new jsPDF();
@@ -98,6 +148,8 @@ export default function App() {
   const startScan = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!targetApp) return;
+
+    initAudio();
 
     setPhase('handshake');
     setLogs([]);
@@ -300,6 +352,60 @@ export default function App() {
                 {phase === 'handshake' && <span className="text-yellow-500 animate-pulse">ESTABLISHING_PQ_KEY_ENCAPSULATION...</span>}
                 {phase === 'scanning' && <span className="text-red-400 animate-pulse">SECURE_TUNNEL_ACTIVE // SCANNING...</span>}
                 {phase === 'complete' && <span className="text-red-500 neon-text">CONNECTION_SECURED // SCAN_FINISHED</span>}
+              </div>
+            </div>
+
+            {/* Local VPN & Threat Feed Simulator */}
+            <div className="bg-black border-2 border-red-500 p-6 neon-border flex flex-col h-[380px]">
+              <div className="flex items-center justify-between mb-4 border-b-2 border-red-500 pb-2">
+                <h2 className="text-sm font-bold text-red-500 flex items-center gap-2 uppercase tracking-widest">
+                  <Radio className="w-4 h-4 animate-pulse" /> Live_Threat_Intel
+                </h2>
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] text-red-600 font-bold uppercase tracking-widest">Global Subnet</span>
+                  <div className="w-2 h-2 bg-red-500 animate-ping"></div>
+                </div>
+              </div>
+
+              <div className="flex-1 overflow-y-auto space-y-2 mb-4 scrollbar-hide">
+                <AnimatePresence initial={false}>
+                  {threatFeed.map((threat) => (
+                    <motion.div
+                      key={threat.id}
+                      initial={{ opacity: 0, x: -20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      exit={{ opacity: 0 }}
+                      className={`p-2 border border-red-900 bg-red-950/20 text-[10px] sm:text-xs font-bold uppercase tracking-wider flex flex-col gap-1 ${threat.action === 'blocked' ? 'opacity-50' : ''}`}
+                    >
+                      <div className="flex justify-between items-center text-red-400">
+                        <span className="flex items-center gap-1.5"><Crosshair className="w-3 h-3 text-yellow-500" /> {threat.ip}</span>
+                        <span>{threat.timestamp.toLocaleTimeString([], { hour12: false })}</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-red-500">{threat.type}</span>
+                        {threat.action === 'blocked' ? (
+                          <span className="text-red-600 bg-red-900/50 px-1 py-0.5 border border-red-800 flex items-center gap-1"><ShieldBan className="w-3 h-3" /> BLOCKED</span>
+                        ) : (
+                          <span className="text-yellow-500 bg-yellow-900/30 px-1 py-0.5 border border-yellow-700 animate-pulse">DETECTED</span>
+                        )}
+                      </div>
+                    </motion.div>
+                  ))}
+                </AnimatePresence>
+              </div>
+
+              <div className="pt-4 border-t-2 border-red-500">
+                <button
+                  type="button"
+                  onClick={() => setVpnActive(!vpnActive)}
+                  className={`w-full flex items-center justify-center gap-2 border-2 ${vpnActive ? 'border-red-600 bg-red-900 text-black shadow-[0_0_15px_rgba(239,68,68,0.8)]' : 'border-red-500 bg-black text-red-500 hover:bg-red-950'} font-bold py-2.5 uppercase tracking-widest transition-all`}
+                >
+                  {vpnActive ? <ShieldBan className="w-4 h-4" /> : <WifiOff className="w-4 h-4" />}
+                  {vpnActive ? 'LOCAL_VPN_INTERCEPT: ACTIVE' : 'ENGAGE_LOCAL_VPN_BLOCKER'}
+                </button>
+                <p className="text-[9px] text-red-700 text-center mt-2 uppercase tracking-widest">
+                  {vpnActive ? 'DROPPING PACKETS & NULL-ROUTING ATTACKER IPs VIA VIRTUAL ADAPTER' : 'WARNING: BROWSER ENVIRONMENT CANNOT HOOK NATIVE OS ROUTING. MITIGATION IS SIMULATED.'}
+                </p>
               </div>
             </div>
           </div>

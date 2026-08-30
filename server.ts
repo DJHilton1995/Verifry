@@ -23,8 +23,7 @@ const PORT = 3000;
 const HTTPS_PORT = 8443;
 
 // Generate ephemeral Self-Signed Certs for the secure service
-const pems = selfsigned.generate([{ name: 'commonName', value: 'hostwarden.local' }], { days: 1, keySize: 2048 });
-
+// (Moved into startServer to handle async generation)
 
 // In-memory Job Store
 const jobs = new Map<string, any>();
@@ -227,6 +226,9 @@ async function startServer() {
   app.listen(PORT, '0.0.0.0', () => {
     console.log(`Execution Chamber Engine active on port ${PORT} [Strict TLS 1.3 Enforced via LB]`);
   });
+
+  // Generate ephemeral Self-Signed Certs for the secure service
+  const pems = await selfsigned.generate([{ name: 'commonName', value: 'hostwarden.local' }], { days: 1, keySize: 2048 } as any);
 
   // Secure HTTPS Service (Strict TLS 1.3)
   const httpsServer = https.createServer({
