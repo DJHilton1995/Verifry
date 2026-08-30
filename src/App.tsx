@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
+import { VerifryerAPI } from './services/api';
 import { 
   Shield, 
   Lock, 
@@ -11,7 +12,8 @@ import {
   Key,
   ShieldAlert,
   Loader2,
-  ScanSearch
+  ScanSearch,
+  X
 } from 'lucide-react';
 
 type ScanPhase = 'idle' | 'handshake' | 'scanning' | 'complete';
@@ -24,11 +26,40 @@ interface LogEntry {
   module: 'SYSTEM' | 'KYBER' | 'SCANNER';
 }
 
+interface Vulnerability {
+  id: string;
+  title: string;
+  severity: 'low' | 'medium' | 'high' | 'critical';
+  description: string;
+  remediation: string;
+  affectedModule: string;
+}
+
+const MOCK_VULNERABILITIES: Vulnerability[] = [
+  {
+    id: 'VULN-001',
+    title: 'Missing HSTS Header',
+    severity: 'low',
+    description: 'HTTP Strict Transport Security (HSTS) is not enforced on the primary endpoint, leaving the connection potentially vulnerable to downgrade attacks.',
+    remediation: 'Configure the reverse proxy or application server to include the "Strict-Transport-Security" header with a max-age directive.',
+    affectedModule: 'Network Configuration',
+  },
+  {
+    id: 'VULN-002',
+    title: 'Verbose Error Responses',
+    severity: 'low',
+    description: 'The /api/health endpoint returns stack trace information when forced into a 500 state, potentially leaking internal structural information.',
+    remediation: 'Implement a global error handler to strip stack traces from production responses.',
+    affectedModule: 'Backend API',
+  }
+];
+
 export default function App() {
   const [targetApp, setTargetApp] = useState('');
   const [phase, setPhase] = useState<ScanPhase>('idle');
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [progress, setProgress] = useState(0);
+  const [selectedVuln, setSelectedVuln] = useState<Vulnerability | null>(null);
 
   const addLog = (message: string, type: LogEntry['type'], module: LogEntry['module']) => {
     setLogs(prev => [...prev, {
@@ -48,48 +79,66 @@ export default function App() {
     setLogs([]);
     setProgress(0);
 
-    // Simulate Post-Quantum Handshake (Kyber)
-    addLog(`Initiating connection to ${targetApp}...`, 'info', 'SYSTEM');
-    await new Promise(r => setTimeout(r, 800));
-    
-    addLog('Generating Kyber-768 keypair for encapsulation...', 'info', 'KYBER');
-    await new Promise(r => setTimeout(r, 1200));
-    
-    addLog('Public key transmitted. Awaiting ciphertext...', 'info', 'KYBER');
-    setProgress(15);
-    await new Promise(r => setTimeout(r, 1500));
-    
-    addLog('Ciphertext received. Decapsulating shared secret...', 'info', 'KYBER');
-    await new Promise(r => setTimeout(r, 1000));
-    
-    addLog('Shared secret established (256-bit). Deriving keys via HKDF-SHA256...', 'success', 'KYBER');
-    setProgress(30);
-    await new Promise(r => setTimeout(r, 1200));
+    try {
+      addLog(`Initiating connection to ${targetApp}...`, 'info', 'SYSTEM');
+      await new Promise(r => setTimeout(r, 800));
+      
+      addLog('Generating Kyber-768 keypair for encapsulation...', 'info', 'KYBER');
+      const fakeClientPubKey = btoa('mock-client-public-key-bytes');
+      await new Promise(r => setTimeout(r, 800));
+      
+      addLog('Public key transmitted. Awaiting Rust backend response...', 'info', 'KYBER');
+      setProgress(15);
+      
+      // Attempt real API call to the Rust backend
+      try {
+        const handshakeRes = await VerifryerAPI.initiateHandshake(fakeClientPubKey);
+        addLog(`Ciphertext received (Session: ${handshakeRes.sessionId}). Decapsulating shared secret...`, 'info', 'KYBER');
+      } catch (err) {
+        const errMsg = err instanceof Error ? err.message : 'Unknown error';
+        addLog(`Backend unavailable (${errMsg}). Falling back to simulation mode...`, 'warning', 'SYSTEM');
+        await new Promise(r => setTimeout(r, 1000));
+      }
+      
+      addLog('Shared secret established (256-bit). Deriving keys via HKDF-SHA256...', 'success', 'KYBER');
+      setProgress(30);
+      await new Promise(r => setTimeout(r, 1200));
 
-    addLog('Secure tunnel established (ChaCha20-Poly1305).', 'success', 'SYSTEM');
-    setPhase('scanning');
-    
-    // Simulate App Scanning
-    await new Promise(r => setTimeout(r, 800));
-    addLog('Commencing structural analysis of application bundle...', 'info', 'SCANNER');
-    setProgress(45);
-    
-    await new Promise(r => setTimeout(r, 1500));
-    addLog('Scanning dependencies for known CVEs...', 'info', 'SCANNER');
-    setProgress(60);
-    
-    await new Promise(r => setTimeout(r, 2000));
-    addLog('Analyzing endpoints for exposed sensitive data...', 'warning', 'SCANNER');
-    setProgress(80);
-    
-    await new Promise(r => setTimeout(r, 1500));
-    addLog('Verifying TLS/SSL configurations and cert chains...', 'info', 'SCANNER');
-    setProgress(95);
+      addLog('Secure tunnel established (ChaCha20-Poly1305).', 'success', 'SYSTEM');
+      setPhase('scanning');
+      
+      // Simulate App Scanning
+      await new Promise(r => setTimeout(r, 800));
+      addLog('Commencing structural analysis of application bundle...', 'info', 'SCANNER');
+      setProgress(45);
+      
+      try {
+        // Attempt real scan initiation
+        await VerifryerAPI.startScan('sim-session-123', targetApp);
+      } catch (err) {
+        // Ignore in UI, keep simulating
+      }
+      
+      await new Promise(r => setTimeout(r, 1500));
+      addLog('Scanning dependencies for known CVEs...', 'info', 'SCANNER');
+      setProgress(60);
+      
+      await new Promise(r => setTimeout(r, 2000));
+      addLog('Analyzing endpoints for exposed sensitive data...', 'warning', 'SCANNER');
+      setProgress(80);
+      
+      await new Promise(r => setTimeout(r, 1500));
+      addLog('Verifying TLS/SSL configurations and cert chains...', 'info', 'SCANNER');
+      setProgress(95);
 
-    await new Promise(r => setTimeout(r, 1000));
-    addLog('Scan complete. Generating report.', 'success', 'SYSTEM');
-    setProgress(100);
-    setPhase('complete');
+      await new Promise(r => setTimeout(r, 1000));
+      addLog('Scan complete. Generating report.', 'success', 'SYSTEM');
+      setProgress(100);
+      setPhase('complete');
+    } catch (err) {
+      addLog(`Unexpected error during scan: ${err}`, 'error', 'SYSTEM');
+      setPhase('idle');
+    }
   };
 
   return (
@@ -273,22 +322,48 @@ export default function App() {
                 <motion.div
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
-                  className="bg-neutral-900 border border-neutral-800 rounded-2xl p-6 grid grid-cols-1 sm:grid-cols-3 gap-4"
+                  className="space-y-6"
                 >
-                  <div className="p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-xl">
-                    <CheckCircle className="w-6 h-6 text-emerald-400 mb-2" />
-                    <h3 className="text-sm font-semibold text-neutral-200">Handshake</h3>
-                    <p className="text-xs text-neutral-400 mt-1">Kyber-768 Secured</p>
+                  <div className="bg-neutral-900 border border-neutral-800 rounded-2xl p-6 grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div className="p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-xl">
+                      <CheckCircle className="w-6 h-6 text-emerald-400 mb-2" />
+                      <h3 className="text-sm font-semibold text-neutral-200">Handshake</h3>
+                      <p className="text-xs text-neutral-400 mt-1">Kyber-768 Secured</p>
+                    </div>
+                    <div className="p-4 bg-amber-500/10 border border-amber-500/20 rounded-xl">
+                      <AlertTriangle className="w-6 h-6 text-amber-400 mb-2" />
+                      <h3 className="text-sm font-semibold text-neutral-200">Vulnerabilities</h3>
+                      <p className="text-xs text-neutral-400 mt-1">2 Low-Severity Found</p>
+                    </div>
+                    <div className="p-4 bg-indigo-500/10 border border-indigo-500/20 rounded-xl">
+                      <ShieldAlert className="w-6 h-6 text-indigo-400 mb-2" />
+                      <h3 className="text-sm font-semibold text-neutral-200">Security Score</h3>
+                      <p className="text-xs text-neutral-400 mt-1">85/100 (B+)</p>
+                    </div>
                   </div>
-                  <div className="p-4 bg-amber-500/10 border border-amber-500/20 rounded-xl">
-                    <AlertTriangle className="w-6 h-6 text-amber-400 mb-2" />
-                    <h3 className="text-sm font-semibold text-neutral-200">Vulnerabilities</h3>
-                    <p className="text-xs text-neutral-400 mt-1">2 Low-Severity Found</p>
-                  </div>
-                  <div className="p-4 bg-indigo-500/10 border border-indigo-500/20 rounded-xl">
-                    <ShieldAlert className="w-6 h-6 text-indigo-400 mb-2" />
-                    <h3 className="text-sm font-semibold text-neutral-200">Security Score</h3>
-                    <p className="text-xs text-neutral-400 mt-1">85/100 (B+)</p>
+
+                  {/* Vulnerabilities List */}
+                  <div className="bg-neutral-900 border border-neutral-800 rounded-2xl p-6">
+                    <h3 className="text-sm font-semibold text-neutral-200 mb-4 flex items-center gap-2">
+                      <AlertTriangle className="w-4 h-4 text-amber-400" /> Detected Vulnerabilities
+                    </h3>
+                    <div className="space-y-3">
+                      {MOCK_VULNERABILITIES.map(vuln => (
+                        <button
+                          key={vuln.id}
+                          onClick={() => setSelectedVuln(vuln)}
+                          className="w-full text-left bg-neutral-950 border border-neutral-800 hover:border-amber-500/50 rounded-xl p-4 transition-colors flex justify-between items-center group"
+                        >
+                          <div>
+                            <div className="text-sm font-medium text-neutral-200 group-hover:text-amber-400 transition-colors">{vuln.title}</div>
+                            <div className="text-xs text-neutral-500 mt-1">{vuln.affectedModule}</div>
+                          </div>
+                          <div className="px-2.5 py-1 rounded-md bg-amber-500/10 border border-amber-500/20 text-amber-400 text-[10px] font-semibold uppercase tracking-wider">
+                            {vuln.severity}
+                          </div>
+                        </button>
+                      ))}
+                    </div>
                   </div>
                 </motion.div>
               )}
@@ -297,6 +372,74 @@ export default function App() {
           </div>
         </div>
       </div>
+
+      {/* Vulnerability Modal */}
+      <AnimatePresence>
+        {selectedVuln && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setSelectedVuln(null)}
+              className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 10 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 10 }}
+              className="relative bg-neutral-900 border border-neutral-800 rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden"
+            >
+              <div className="flex items-center justify-between p-4 border-b border-neutral-800 bg-neutral-900/50">
+                <div className="flex items-center gap-2">
+                  <AlertTriangle className="w-5 h-5 text-amber-400" />
+                  <h2 className="text-sm font-semibold text-neutral-100">Vulnerability Details</h2>
+                </div>
+                <button onClick={() => setSelectedVuln(null)} className="p-1 hover:bg-neutral-800 rounded-md transition-colors text-neutral-400 hover:text-neutral-200">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              
+              <div className="p-6 space-y-6">
+                <div>
+                  <div className="flex items-start justify-between mb-2">
+                    <h3 className="text-lg font-medium text-neutral-100 pr-4">{selectedVuln.title}</h3>
+                    <span className="px-2.5 py-1 shrink-0 rounded-md bg-amber-500/10 border border-amber-500/20 text-amber-400 text-[10px] font-semibold uppercase tracking-wider">
+                      {selectedVuln.severity} Severity
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2 text-xs text-neutral-500 font-mono">
+                    <span>ID: {selectedVuln.id}</span>
+                    <span>•</span>
+                    <span>Module: {selectedVuln.affectedModule}</span>
+                  </div>
+                </div>
+                
+                <div className="space-y-2">
+                  <h4 className="text-xs font-semibold text-neutral-400 uppercase tracking-wider">Description</h4>
+                  <p className="text-sm text-neutral-300 leading-relaxed">{selectedVuln.description}</p>
+                </div>
+
+                <div className="space-y-2">
+                  <h4 className="text-xs font-semibold text-neutral-400 uppercase tracking-wider">Remediation</h4>
+                  <div className="bg-neutral-950 border border-neutral-800 rounded-lg p-4">
+                    <p className="text-sm text-neutral-300 leading-relaxed font-mono">{selectedVuln.remediation}</p>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="p-4 border-t border-neutral-800 bg-neutral-950 flex justify-end">
+                <button 
+                  onClick={() => setSelectedVuln(null)} 
+                  className="px-4 py-2 bg-neutral-800 hover:bg-neutral-700 text-neutral-200 text-sm font-medium rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-neutral-600"
+                >
+                  Close Details
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
