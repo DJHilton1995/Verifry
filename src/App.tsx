@@ -7,7 +7,7 @@ import {
   Shield, Lock, Server, Terminal, CheckSquare, AlertTriangle, Zap, Key, ShieldAlert, Loader2, ScanSearch, X, Download, Skull, Flame, Activity,
   WifiOff, Radio, Crosshair, ShieldBan
 } from 'lucide-react';
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, AreaChart, Area, XAxis, YAxis } from 'recharts';
 import { initAudio, updateGeigerProgress, stopGeiger, playStaticDischarge } from './utils/audio';
 
 type ScanPhase = 'idle' | 'handshake' | 'scanning' | 'complete';
@@ -37,6 +37,13 @@ interface ThreatEvent {
   timestamp: Date;
 }
 
+interface ThroughputData {
+  time: string;
+  tcp: number;
+  udp: number;
+  icmp: number;
+}
+
 // Using dynamic vulnerabilities from the real backend instead of mocks
 
 export default function App() {
@@ -48,6 +55,39 @@ export default function App() {
 
   const [threatFeed, setThreatFeed] = useState<ThreatEvent[]>([]);
   const [vpnActive, setVpnActive] = useState(false);
+  
+  const [throughputData, setThroughputData] = useState<ThroughputData[]>(() => {
+    return Array.from({ length: 15 }).map((_, i) => ({
+      time: new Date(Date.now() - (15 - i) * 1000).toLocaleTimeString([], { hour12: false, second: '2-digit', minute: '2-digit' }),
+      tcp: parseFloat((Math.random() * 40 + 10).toFixed(2)),
+      udp: parseFloat((Math.random() * 15 + 5).toFixed(2)),
+      icmp: parseFloat((Math.random() * 2).toFixed(2)),
+    }));
+  });
+
+  // Throughput Simulator Effect
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setThroughputData(prev => {
+        const now = new Date();
+        const timeStr = now.toLocaleTimeString([], { hour12: false, second: '2-digit', minute: '2-digit' });
+        
+        const baseTcp = vpnActive ? Math.random() * 5 + 2 : Math.random() * 40 + 10;
+        const baseUdp = vpnActive ? Math.random() * 2 : Math.random() * 15 + 5;
+        const baseIcmp = vpnActive ? 0 : Math.random() * 2;
+
+        const next = [...prev, {
+          time: timeStr,
+          tcp: parseFloat(baseTcp.toFixed(2)),
+          udp: parseFloat(baseUdp.toFixed(2)),
+          icmp: parseFloat(baseIcmp.toFixed(2)),
+        }];
+        
+        return next.length > 15 ? next.slice(next.length - 15) : next;
+      });
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [vpnActive]);
 
   // Live Threat Feed Simulation
   useEffect(() => {
@@ -356,7 +396,7 @@ export default function App() {
             </div>
 
             {/* Local VPN & Threat Feed Simulator */}
-            <div className="bg-black border-2 border-red-500 p-6 neon-border flex flex-col h-[380px]">
+            <div className="bg-black border-2 border-red-500 p-6 neon-border flex flex-col h-[550px]">
               <div className="flex items-center justify-between mb-4 border-b-2 border-red-500 pb-2">
                 <h2 className="text-sm font-bold text-red-500 flex items-center gap-2 uppercase tracking-widest">
                   <Radio className="w-4 h-4 animate-pulse" /> Live_Threat_Intel
@@ -365,6 +405,46 @@ export default function App() {
                   <span className="text-[10px] text-red-600 font-bold uppercase tracking-widest">Global Subnet</span>
                   <div className="w-2 h-2 bg-red-500 animate-ping"></div>
                 </div>
+              </div>
+
+              {/* Throughput Chart */}
+              <div className="h-32 mb-4 border border-red-900 bg-black p-1">
+                 <ResponsiveContainer width="100%" height="100%">
+                   <AreaChart data={throughputData} margin={{ top: 5, right: 0, left: -25, bottom: 0 }}>
+                     <defs>
+                       <linearGradient id="colorTcp" x1="0" y1="0" x2="0" y2="1">
+                         <stop offset="5%" stopColor="#ef4444" stopOpacity={0.3}/>
+                         <stop offset="95%" stopColor="#ef4444" stopOpacity={0}/>
+                       </linearGradient>
+                       <linearGradient id="colorUdp" x1="0" y1="0" x2="0" y2="1">
+                         <stop offset="5%" stopColor="#eab308" stopOpacity={0.3}/>
+                         <stop offset="95%" stopColor="#eab308" stopOpacity={0}/>
+                       </linearGradient>
+                       <linearGradient id="colorIcmp" x1="0" y1="0" x2="0" y2="1">
+                         <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3}/>
+                         <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
+                       </linearGradient>
+                     </defs>
+                     <XAxis dataKey="time" hide />
+                     <YAxis stroke="#991b1b" fontSize={9} tickFormatter={(val) => `${val}M`} axisLine={false} tickLine={false} />
+                     <Tooltip 
+                       contentStyle={{ backgroundColor: 'rgba(0,0,0,0.9)', borderColor: '#ef4444', color: '#ef4444', fontSize: '10px' }} 
+                       itemStyle={{ color: '#ef4444', padding: '2px 0' }}
+                       labelStyle={{ display: 'none' }}
+                     />
+                     <Area type="step" dataKey="tcp" stroke="#ef4444" strokeWidth={1.5} fillOpacity={1} fill="url(#colorTcp)" isAnimationActive={false} />
+                     <Area type="step" dataKey="udp" stroke="#eab308" strokeWidth={1.5} fillOpacity={1} fill="url(#colorUdp)" isAnimationActive={false} />
+                     <Area type="step" dataKey="icmp" stroke="#3b82f6" strokeWidth={1.5} fillOpacity={1} fill="url(#colorIcmp)" isAnimationActive={false} />
+                   </AreaChart>
+                 </ResponsiveContainer>
+                 <div className="flex justify-between items-center text-[9px] uppercase tracking-widest text-red-700 mt-1 px-1">
+                    <span>Packet Throughput (Mbps)</span>
+                    <div className="flex gap-2 font-bold">
+                       <span className="text-red-500">TCP</span>
+                       <span className="text-yellow-500">UDP</span>
+                       <span className="text-blue-500">ICMP</span>
+                    </div>
+                 </div>
               </div>
 
               <div className="flex-1 overflow-y-auto space-y-2 mb-4 scrollbar-hide">
