@@ -56,6 +56,24 @@ export default function App() {
   const [threatFeed, setThreatFeed] = useState<ThreatEvent[]>([]);
   const [vpnActive, setVpnActive] = useState(false);
   
+  // Clean unwanted URL parameters immediately on mount
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    const paramsToBlock = ['showAssistant', 'showPreview', 'project'];
+    let needsUpdate = false;
+
+    paramsToBlock.forEach(param => {
+      if (url.searchParams.has(param)) {
+        url.searchParams.delete(param);
+        needsUpdate = true;
+      }
+    });
+
+    if (needsUpdate) {
+      window.history.replaceState({}, document.title, url.toString());
+    }
+  }, []);
+
   const [throughputData, setThroughputData] = useState<ThroughputData[]>(() => {
     return Array.from({ length: 15 }).map((_, i) => ({
       time: new Date(Date.now() - (15 - i) * 1000).toLocaleTimeString([], { hour12: false, second: '2-digit', minute: '2-digit' }),
